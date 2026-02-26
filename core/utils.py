@@ -49,7 +49,7 @@ class ImovelPredictor:
         print(f"Scraping URL: {url_base}")
 
         try:
-            res = self.scraper.get(url_base)
+            res = self.scraper.get(url_base, timeout=10)
             if res.status_code != 200:
                 return {"error": "Não foi possível acessar o DF Imóveis. Verifique os parâmetros."}
 
@@ -75,7 +75,7 @@ class ImovelPredictor:
             # Limite de páginas para não demorar muito na web (max 5 para demo)
             for i in range(1, min(paginas, 5) + 1):
                 url = f"{url_base}?pagina={i}"
-                res = self.scraper.get(url)
+                res = self.scraper.get(url,timeout=10)
                 soup = BeautifulSoup(res.text, "html.parser")
 
                 cards = soup.find_all("div", class_="imovel-info")  # Classe simplificada para busca
