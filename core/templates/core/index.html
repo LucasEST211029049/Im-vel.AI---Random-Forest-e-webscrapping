@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImóvelAI | Precificação Inteligente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+        }
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .card-form {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            background: white;
+        }
+        .form-label {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 0.9rem;
+        }
+        .btn-predict {
+            background-color: var(--secondary-color);
+            border: none;
+            padding: 12px 30px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .btn-predict:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+        .result-card {
+            background: linear-gradient(to right, #ffffff, #f1f8ff);
+            border-left: 5px solid var(--secondary-color);
+        }
+        /* Loader Overlay */
+        #loader {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="loader-spinner mb-3"></div>
+        <h5 class="text-muted">Analisando o mercado em tempo real...</h5>
+        <small>Realizando o scraping e treinando o modelo de Machine Learning.</small>
+    </div>
+
+    <div class="hero-section text-center">
+        <div class="container">
+            <h1 class="display-4 fw-bold"><i class="fas fa-home me-2"></i>ImóvelAI</h1>
+            <p class="lead">Precificação de imóveis baseada em Inteligência Artificial e dados reais do mercado.</p>
+        </div>
+    </div>
+
+    <div class="container mb-5">
+        <div class="row justify-content-center">
+
+            <div class="col-lg-8">
+
+                {% if erro %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>{{ erro }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+
+                {% if resultado %}
+                <div class="card card-form p-4 mb-4 result-card animate__animated animate__fadeIn">
+                    <div class="card-body text-center">
+                        <h6 class="text-uppercase text-muted">Valor Estimado</h6>
+                        <h2 class="display-4 fw-bold text-success my-3">
+                            R$ {{ resultado.preco|floatformat:2 }}
+                        </h2>
+                        <div class="d-flex justify-content-center gap-4 mt-4">
+                            <div class="text-muted">
+                                <i class="fas fa-database me-1"></i> {{ resultado.qtd_imoveis_analisados }} Imóveis base usados
+                            </div>
+                            <div class="text-muted">
+                                <i class="fas fa-brain me-1"></i> Modelo Random Forest Atualizado
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card card-form p-4">
+                    <div class="card-body">
+                        <h4 class="mb-4 text-primary"><i class="fas fa-sliders-h me-2"></i>Parâmetros do Imóvel</h4>
+
+                        <form method="POST" onsubmit="document.getElementById('loader').style.display = 'flex'">
+                            {% csrf_token %}
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Operação</label>
+                                    <select class="form-select" name="operacao" id="operacao">
+                                        <option value="venda">Venda</option>
+                                        <option value="aluguel">Aluguel</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">UF</label>
+                                    <select class="form-select" name="uf" id="uf" onchange="atualizarCidades()">
+                                        <option value="df">DF</option>
+                                        <option value="go">GO</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Cidade</label>
+                                    <select class="form-select" name="cidade_busca" id="cidade" onchange="atualizarBairros()" required>
+                                        </select>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Bairro Específico</label>
+                                    <select class="form-select" name="bairro_preferencia" id="bairro">
+                                        </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Tipo de Imóvel</label>
+                                    <select class="form-select" name="tipo_imovel" id="tipo_imovel">
+                                        <option value="apartamento">Apartamento</option>
+                                        <option value="casa">Casa</option>
+                                        <option value="casa-em-condominio">Casa em Condomínio</option>
+                                        <option value="kitnet">Kitnet</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <hr class="my-4 text-muted">
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <label class="form-label">Área (m²)</label>
+                                    <input type="number" class="form-control" name="metragem" placeholder="Ex: 70" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Quartos</label>
+                                    <input type="number" class="form-control" name="quartos" value="2" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Suítes</label>
+                                    <input type="number" class="form-control" name="suites" value="1" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Vagas</label>
+                                    <input type="number" class="form-control" name="vagas" value="1" required>
+                                </div>
+                            </div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-predict text-white shadow">
+                                    <i class="fas fa-search-dollar me-2"></i> Calcular Preço de Mercado
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center mt-5 text-muted">
+            <small>&copy; 2026 ImóvelAI - Projeto de Data Science para fins educativos.</small>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    const dicionarioLocais = {
+        "df": {
+            "aguas-claras": {
+                nome: "Águas Claras",
+                bairros: [
+                    { slug: "todos", nome: "Todos os Bairros" },
+                    { slug: "norte", nome: "Norte" },
+                    { slug: "sul", nome: "Sul" }
+                ]
+            },
+            "brasilia": {
+                nome: "Brasília (Plano Piloto)",
+                bairros: [
+                    { slug: "todos", nome: "Todos os Bairros" },
+                    { slug: "asa-norte", nome: "Asa Norte" },
+                    { slug: "asa-sul", nome: "Asa Sul" },
+                    { slug: "noroeste", nome: "Noroeste" },
+                    { slug: "sudoeste", nome: "Sudoeste" },
+                    { slug: "lago-norte", nome: "Lago Norte" },
+                    { slug: "lago-sul", nome: "Lago Sul" }
+                ]
+            },
+            "guara": {
+                nome: "Guará",
+                bairros: [
+                    { slug: "todos", nome: "Todos os Bairros" },
+                    { slug: "guara-i", nome: "Guará I" },
+                    { slug: "guara-ii", nome: "Guará II" },
+                    { slug: "lucio-costa", nome: "Lúcio Costa" }
+                ]
+            },
+            "taguatinga": {
+                nome: "Taguatinga",
+                bairros: [
+                    { slug: "todos", nome: "Todos os Bairros" },
+                    { slug: "taguatinga-norte", nome: "Taguatinga Norte" },
+                    { slug: "taguatinga-sul", nome: "Taguatinga Sul" },
+                    { slug: "taguatinga-centro", nome: "Taguatinga Centro" }
+                ]
+            }
+        },
+        "go": {
+            "aguas-lindas-de-goias": {
+                nome: "Águas Lindas de Goiás",
+                bairros: [
+                    { slug: "todos", nome: "Todos os Bairros" },
+                    { slug: "chacaras-coimbra", nome: "Chácaras Coimbra" },
+                    { slug: "mansoes-camargo", nome: "Mansões Camargo" }
+                ]
+            },
+            "valparaiso-de-goias": {
+                nome: "Valparaíso de Goiás",
+                bairros: [
+                    { slug: "todos", nome: "Todos os Bairros" },
+                    { slug: "valparaiso-i", nome: "Valparaíso I" },
+                    { slug: "parque-esplanada-iii", nome: "Parque Esplanada III" }
+                ]
+            }
+        }
+    };
+
+    function atualizarCidades() {
+        const uf = document.getElementById("uf").value;
+        const selectCidade = document.getElementById("cidade");
+        selectCidade.innerHTML = "";
+
+        const cidades = dicionarioLocais[uf];
+        for (const slug in cidades) {
+            let option = document.createElement("option");
+            option.value = slug;
+            option.text = cidades[slug].nome;
+            selectCidade.appendChild(option);
+        }
+        atualizarBairros();
+    }
+
+    function atualizarBairros() {
+        const uf = document.getElementById("uf").value;
+        const cidadeSlug = document.getElementById("cidade").value;
+        const selectBairro = document.getElementById("bairro");
+        selectBairro.innerHTML = "";
+
+        if (dicionarioLocais[uf] && dicionarioLocais[uf][cidadeSlug]) {
+            const bairros = dicionarioLocais[uf][cidadeSlug].bairros;
+            bairros.forEach(bairro => {
+                let option = document.createElement("option");
+                option.value = bairro.slug;
+                option.text = bairro.nome;
+                selectBairro.appendChild(option);
+            });
+        }
+    }
+
+    // Inicializa a página com os dados carregados
+    document.addEventListener("DOMContentLoaded", function() {
+        atualizarCidades();
+    });
+    </script>
+</body>
+</html>
